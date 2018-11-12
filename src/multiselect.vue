@@ -1,46 +1,88 @@
 <template lang="pug">
-    .dropdown(:id="randomID" :class="{'dropdown_opened': dropdownVisible}")
-        .dropdown__field(@click="callDropdownToggle" ref="trigger")
+    .dropdown.multiselect(:id="randomID" :class="{'dropdown_opened': dropdownVisible}")
+        .multiselect__field.dropdown__field(@click="callDropdownToggle" ref="trigger")
             slot(name="trigger")
-                .dropdown__trigger(:class="{'dropdown__trigger_with-arrow': triggerArrow}")
-                    input.input(
-                        v-if="!isFocused"
-                        ref="valueInput"
-                        v-model="visibleValue"
-                        :placeholder="placeholder"
-                        :class="inputClasses"
-                        readonly
-                        @focus="onFocus"
-                    )
-                    input.input(
-                        v-if="isFocused"
-                        ref="searchInput"
-                        v-model="searchQuery"
-                        @blur="onBlur"
-                        @keydown="searchInputKeyDown"
-                        :class="inputClasses"
-                    )
-                    .dropdown__trigger-limiter
-        transition(name="fadeIn")
-            .dropdown__items(v-if="dropdownVisible" :class="{'dropdown__items_with-arrow': listArrow}" @click.stop="")
-                .dropdown-list(:style="{maxHeight: listMaxHeight}")
-                    .dropdown-list__item.dropdown-list__item_label(v-if="selectedOptionsList.length === 0") Выберите {{ hints[1] }}:
-                    .dropdown-list__item.dropdown-list__item_label(v-if="selectedOptionsList.length > 0") Выбрано:
-                    a.dropdown-list__item(
+                .dropdown__trigger
+                    .simple-input(v-if="simpleInput")
+                        input.input(
+                            ref="valueInput"
+                            v-model="inputValue"
+                            :placeholder="placeholder"
+                            :class="inputClasses"
+                            @focus="onFocus"
+                            @blur="onBlur"
+                            @keydown="searchInputKeyDown"
+                        )
+                    .input-with-label(v-else)
+                        label.input-with-label__hint(@click.prevent="labelClick") {{ fieldLabel }}
+                        input.input-with-label__field.input(
+                            ref="valueInput"
+                            v-model="inputValue"
+                            :placeholder="placeholder"
+                            :class="inputClasses"
+                            @focus="onFocus"
+                            @blur="onBlur"
+                            @keydown="searchInputKeyDown"
+                        )
+                    transition(name="fade")
+                        .dropdown__trigger-limiter(v-if="showWordLimiter")
+        .multiselect__field.multiselect__field_mobile
+            .multiselect__selected(v-if="selectedOptionsList.length > 0")
+                .dropdown-list
+                    a.dropdown-list__item.dropdown-list__item_selected.dropdown-list__item_white(
                         v-for="option in selectedOptionsList"
                         v-html="option[labelKey]"
-                        :class="{'dropdown-list__item_selected': selectedItemsIds.indexOf(option[valueKey]) !== -1}"
                         href="#"
                         @click.prevent="toggleOption(option)"
                     )
-                    .dropdown-list__item.dropdown-list__item_label(v-if="selectedOptionsList.length > 0 && unselectedOptionsList.length > 0") Другие {{ hints[1] }}:
-                    a.dropdown-list__item(
-                        v-for="option in unselectedOptionsList"
+                button.multiselect__add(@click.prevent="openModalList") + {{ addMoreHint }}
+            .multiselect__empty(v-else)
+                input.multiselect__empty-input.input(
+                    :value="emptyHint"
+                    :placeholder="fieldLabel"
+                    :class="inputClasses"
+                    @click.prevent="openModalList"
+                    readonly
+                )
+        transition(name="fade")
+            .dropdown__items(v-if="dropdownVisible")
+                .dropdown-list(ref="optionsList" :style="{maxHeight: listMaxHeight}")
+                    .dropdown-list__item.dropdown-list__item_label(v-if="selectedOptionsList.length === 0") Выберите {{ labelsHint }}:
+                    .dropdown-list__item.dropdown-list__item_label(v-if="selectedOptionsList.length > 0") Выбрано:
+                    a.dropdown-list__item.dropdown-list__item_selected(
+                        v-for="(option, index) in selectedOptionsList"
                         v-html="option[labelKey]"
-                        :class="{'dropdown-list__item_selected': selectedItemsIds.indexOf(option[valueKey]) !== -1}"
                         href="#"
                         @click.prevent="toggleOption(option)"
+                        :class="{'dropdown-list__item_hovered': hoveredIndex === index}"
                     )
+                    .dropdown-list__item.dropdown-list__item_label(v-if="selectedOptionsList.length > 0 && unselectedOptionsList.length > 0") Другие {{ labelsHint }}:
+                    a.dropdown-list__item(
+                        v-for="(option, index) in unselectedOptionsList"
+                        v-html="option[labelKey]"
+                        href="#"
+                        @click.prevent="toggleOption(option)"
+                        :class="{'dropdown-list__item_hovered': (hoveredIndex === (selectedOptionsList.length + index))}"
+                    )
+        transition(name="fade")
+            .multiselect__modal(v-if="listModalVisible" ref="modal")
+                header.multiselect__modal-header
+                    input.multiselect__modal-input.input(
+                        ref="modalSearch"
+                        v-model="modalSearchString"
+                        :placeholder="fieldLabel"
+                        @keydown="searchInputKeyDownMobile"
+                    )
+                    a.multiselect__modal-close(href="#" @click.prevent="closeModalList")
+                        .the-x
+                .multiselect__modal-body
+                    .dropdown-list
+                        a.dropdown-list__item(
+                            v-for="option in unselectedOptionsList"
+                            v-html="option[labelKey]"
+                            href="#"
+                            @click.prevent="toggleOption(option)"
+                        )
 </template>
 
 <script>
@@ -48,7 +90,7 @@ import {wordForm}    from 'helpers'
 import mixinDropdown from 'dropdown-mixin'
 
 export default {
-    name: 'dropdown-list',
+    name: 'multiselect',
     mixins: [mixinDropdown],
     props: {
         /**
@@ -90,6 +132,20 @@ export default {
             default: 5,
         },
         /**
+         * Label text for input field
+         */
+        fieldLabel: {
+            type: String,
+            default: 'Выберите',
+        },
+        /**
+         * Show only input without label
+         */
+        simpleInput: {
+            type: Boolean,
+            default: false,
+        },
+        /**
          * Placeholder for input field
          */
         placeholder: {
@@ -106,6 +162,14 @@ export default {
             type: String,
             default: '',
         },
+        addMoreHint: {
+            type: String,
+            default: 'Добавить ещё',
+        },
+        labelHint: {
+            type: String,
+            default: '',
+        },
 
         /**
          * Class list for input tag
@@ -116,26 +180,24 @@ export default {
                 return [];
             },
         },
-        triggerArrow: {
-            type: Boolean,
-            default: false
-        },
-        listArrow: {
-            type: Boolean,
-            default: false
-        },
     },
     data () {
         return {
-            selectedItemsIds: [],
-            listMaxHeight:    'none',
-
-            searchQuery: '',
-            isFocused:   false,
-            localChange: false,
+            selectedItemsIds:  [],
+            listMaxHeight:     'none',
+            inputValue:        '',
+            modalSearchString: '',
+            isFocused:         false,
+            localChange:       false,
+            hoveredIndex:      -1,
+            listModalVisible:  false,
         };
     },
     computed: {
+        labelsHint () {
+            return this.labelHint.length > 0 ? this.labelHint : this.hints[1];
+        },
+
         visibleValue () {
             if (this.selectedOptions.length === 0) {
                 return this.emptyHint.length > 0 ? this.emptyHint : '';
@@ -146,6 +208,12 @@ export default {
             if (this.selectedOptions.length > 1) {
                 return wordForm(this.selectedOptions.length, this.hints, true);
             }
+        },
+
+        searchQuery () {
+            return this.modalSearchString ?
+                this.modalSearchString :
+                this.isFocused ? this.inputValue : '';
         },
 
         selectedOptions () {
@@ -168,23 +236,69 @@ export default {
         unselectedOptionsList () {
             return this.searchQuery.length === 0 ? this.unselectedOptions : this.filterBySearchQuery(this.unselectedOptions);
         },
+
+        showWordLimiter () {
+            return this.isFocused === false && this.visibleValue.length > 0;
+        },
     },
     created () {
         this.setSelectedOptions();
     },
     methods: {
         onFocus () {
-            this.isFocused = true;
-            this.setMaxHeight();
-            this.dropdownOpen();
-
-            this.$nextTick(() => {
-                this.$refs.searchInput.focus();
-                this.$el.click();
-            });
+            this.inputValue = '';
+            this.isFocused  = true;
         },
         onBlur () {
-            this.isFocused = false;
+            // Wait for click by option (toggleOption) when searchQuery.length > 0
+            setTimeout(() => {
+                this.inputValue = this.visibleValue;
+                this.isFocused  = false;
+            }, 230);
+        },
+        labelClick () {
+            this.isFocused ? this.$refs.valueInput.blur() : this.$refs.valueInput.focus();
+        },
+
+        fixPosition () {
+            const header = document.querySelector('.page-header__top');
+
+            if (header === null) {
+                return false;
+            }
+
+            const headerShowHeight = 80 + parseInt(header.style.top || 0);
+
+            this.$refs.modal.style.top    = `${headerShowHeight}px`;
+            this.$refs.modal.style.height = `calc(100% - ${headerShowHeight}px)`;
+        },
+
+        openModalList () {
+            this.listModalVisible = true;
+            document.body.classList.add('block-scroll');
+            window.addEventListener('keydown', this.mayBeHideModal, true);
+
+            let interval = setInterval(() => {
+                if (!this.$refs.modalSearch) {
+                    return false;
+                }
+
+                this.fixPosition();
+                this.$refs.modalSearch.focus();
+
+                clearInterval(interval);
+            })
+        },
+        closeModalList () {
+            this.listModalVisible = false;
+            this.modalSearchString = '';
+            document.body.classList.remove('block-scroll');
+            window.removeEventListener('keydown', this.mayBeHideModal, true);
+        },
+        mayBeHideModal (event) {
+            if (event.key.toLowerCase() === 'escape') {
+                this.closeModalList();
+            }
         },
 
         setMaxHeight () {
@@ -195,6 +309,7 @@ export default {
             if (!this.dropdownVisible) {
                 this.setMaxHeight();
             } else {
+                this.$refs.valueInput.blur();
                 this.onBlur();
             }
 
@@ -205,6 +320,7 @@ export default {
             this.selectedItemsIds = [];
 
             if (this.value.length === 0) {
+                this.inputValue = this.visibleValue;
                 return true;
             }
 
@@ -216,15 +332,11 @@ export default {
                     }
                 })
             });
+
+            this.inputValue = this.visibleValue;
         },
         toggleOption (option) {
-            if (this.$refs.valueInput) {
-                this.$refs.valueInput.blur();
-            }
-            this.searchQuery = '';
-            this.onBlur();
-
-            let optionId = option[this.valueKey];
+            const optionId = option[this.valueKey];
 
             if (this.selectedItemsIds.indexOf(optionId) === -1) {
                 this.selectedItemsIds.push(optionId);
@@ -232,9 +344,16 @@ export default {
                 this.selectedItemsIds = this.selectedItemsIds.filter(id => id !== optionId);
             }
 
-            this.dropdownClose();
+            if (this.listModalVisible) {
+                this.closeModalList();
+            }
 
             this.$nextTick(() => {
+                this.$refs.valueInput.blur();
+                this.onBlur();
+
+                this.dropdownClose();
+
                 this.localChange = true;
                 this.$emit('input', this.selectedOptions);
 
@@ -245,9 +364,26 @@ export default {
         },
 
         searchInputKeyDown (event) {
+            if (event.key.toLowerCase() === 'enter' && this.isFocused) {
+                if (this.hoveredIndex !== -1) {
+                    event.preventDefault();
+                    this.onKeyPress(event);
+                    return false;
+                }
+
+                if (this.selectedOptionsList.length > 0) {
+                    this.toggleOption(this.selectedOptionsList[0]);
+                    event.preventDefault();
+                } else if (this.unselectedOptionsList.length > 0) {
+                    this.toggleOption(this.unselectedOptionsList[0]);
+                    event.preventDefault();
+                }
+            }
+        },
+        searchInputKeyDownMobile (event) {
             if (event.key.toLowerCase() === 'enter') {
-                if (this.optionsList.length > 0) {
-                    this.toggleOption(this.optionsList[0]);
+                if (this.unselectedOptionsList.length > 0) {
+                    this.toggleOption(this.unselectedOptionsList[0]);
                     event.preventDefault();
                 }
             }
@@ -262,6 +398,35 @@ export default {
                 return optionString.search(searchString) !== -1;
             });
         },
+
+        onKeyPress (event) {
+            if (event.key.toLowerCase() === 'arrowdown') {
+                if (this.hoveredIndex < (this.selectedOptionsList.length + this.unselectedOptionsList.length - 1)) {
+                    this.hoveredIndex++;
+                }
+            }
+            if (event.key.toLowerCase() === 'arrowup') {
+                if (this.hoveredIndex > 0) {
+                    this.hoveredIndex--;
+                }
+            }
+
+            if (event.key.toLowerCase() === 'enter') {
+                if (this.hoveredIndex === -1) {
+                    return false;
+                }
+
+                if (this.hoveredIndex <= (this.selectedOptionsList.length - 1)) {
+                    const hoveredOption = this.selectedOptionsList[this.hoveredIndex];
+
+                    this.toggleOption(hoveredOption);
+                } else if (this.hoveredIndex <= (this.selectedOptionsList.length + this.unselectedOptionsList.length - 1)) {
+                    const hoveredOption = this.unselectedOptionsList[this.hoveredIndex - this.selectedOptionsList.length];
+
+                    this.toggleOption(hoveredOption);
+                }
+            }
+        },
     },
     watch: {
         value (newValue) {
@@ -274,11 +439,94 @@ export default {
         options (newOptions) {
             this.setSelectedOptions();
         },
+        dropdownVisible (visible) {
+            this.hoveredIndex = -1;
+
+            if (visible) {
+                window.addEventListener('keypress', this.onKeyPress, true);
+            } else {
+                window.removeEventListener('keypress', this.onKeyPress, true);
+            }
+        },
     },
 };
 </script>
 
 <style lang="less" scoped>
+.multiselect {
+    &__ {
+        &field {
+            &_mobile {
+                display: none;
+            }
+        }
+        &add {
+            display: -webkit-box;
+            display: -ms-flexbox;
+            display: flex;
+            -webkit-align-items: center;
+            align-items: center;
+            -webkit-justify-content: center;
+            justify-content: center;
+            width: 100%;
+            height: 60px;
+            background: #eee;
+            border: none;
+            text-decoration: none;
+            font-size: 16px;
+            color: black;
+            cursor: pointer;
+        }
+        &empty {
+            &-input {
+                width: 100%;
+            }
+        }
+        &modal {
+            position: fixed;
+            z-index: 999;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            width: 100%;
+            height: 100%;
+            background: white;
+
+            &-header {
+                position: relative;
+                height: 60px;
+            }
+            &-input {
+                width: 95%;
+                font-size: 16px;
+            }
+            &-close {
+                position: absolute;
+                top: 20px;
+                right: 20px;
+                width: 24px;
+                height: 24px;
+            }
+            &-body {
+                height: ~'calc(100% - 60px)';
+                overflow-y: auto;
+            }
+        }
+    }
+
+    @media (max-width: 991px) {
+        &__ {
+            &field {
+                display: none;
+
+                &_mobile {
+                    display: block;
+                }
+            }
+        }
+    }
+}
 .dropdown {
     position: relative;
 
@@ -288,17 +536,20 @@ export default {
 
             .input {
                 width: 100%;
-                cursor: pointer;
+                cursor: default;
 
                 &:active {
                     background-color: #f3f0f5;
                     border-color: #e4dceb !important;
+                    cursor: text;
 
                     & + .dropdown__trigger-limiter {
                         display: none;
                     }
                 }
                 &:focus {
+                    cursor: text;
+
                     & + .dropdown__trigger-limiter {
                         display: none;
                     }
@@ -311,29 +562,12 @@ export default {
 
             &-limiter {
                 position: absolute;
-                top: ~'calc(50% - 12.5px)';
+                z-index: 12;
+                bottom: 12px;
                 right: 1px;
                 width: 45px;
                 height: 25px;
                 background-image: linear-gradient(to right, rgba(255, 255, 255, 0.5), rgb(255, 255, 255));
-            }
-
-            &_with-arrow {
-                &:after {
-                    position: absolute;
-                    top: ~'calc(50% - 2px)';
-                    right: 17px;
-                    content: '';
-                    border-style: solid;
-                    border-width: 5px 5px 0 5px;
-                    border-color: #adadad transparent transparent transparent;
-                    color: #adadad;
-                    transition: transform 0.4s;
-                }
-
-                input {
-                    padding-right: 40px;
-                }
             }
         }
         &items {
@@ -343,41 +577,6 @@ export default {
             margin-top: 2px;
             background-color: white;
             box-shadow: 0 8px 16px rgba(0, 0, 0, 0.08);
-
-            &_with-arrow {
-                &:after,
-                &:before {
-                    position: absolute;
-                    content: '';
-                    width: 0;
-                    height: 0;
-                    border-style: solid;
-                }
-                &:before {
-                    top: -7px;
-                    left: ~'calc(50% - 3px)';
-                    border-width: 0 6px 6px 6px;
-                    border-color: transparent transparent #e5e5e5 transparent;
-                }
-                &:after {
-                    top: -5px;
-                    left: ~'calc(50% - 2px)';
-                    display: inline-block;
-                    border-width: 0 5px 5px 5px;
-                    border-color: transparent transparent white transparent;
-                }
-            }
-        }
-    }
-
-    &_opened {
-        .dropdown__ {
-            &trigger_with-arrow {
-                &:after {
-                    -webkit-transform: rotate(180deg);
-                            transform: rotate(180deg);
-                }
-            }
         }
     }
 }
@@ -409,6 +608,19 @@ export default {
             &:hover {
                 background-color: #eee;
             }
+            &_white {
+                background-color: white;
+
+                &:hover {
+                    background-color: white;
+                }
+            }
+            &_hovered {
+                position: relative;
+                z-index: 1;
+                outline: 1px dotted black;
+                background-color: #eee;
+            }
 
             &_label {
                 color: #888;
@@ -429,5 +641,122 @@ export default {
             }
         }
     }
+}
+.input {
+    height: 60px;
+    padding: 0 10px 0 20px;
+    background: white;
+    border: 1px solid #eee;
+    border-radius: 4px;
+    box-shadow: none;
+    font-size: 16px;
+    font-weight: 400;
+    color: black;
+    transition: 0.2s;
+
+    &:invalid,
+    &_danger {
+        background-color: #fae5e8;
+        border: 1px solid #d0021b;
+
+        &:hover {
+            background-color: #fae5e8;
+            border: 1px solid #d0021b;
+        }
+    }
+    &_square {
+        border-radius: 0;
+    }
+
+    @media (max-width: 991px) {
+        border: none;
+    }
+}
+.input-with-label {
+    position: relative;
+    z-index: 10;
+    height: 80px;
+    background: white;
+
+    &__ {
+        &hint {
+            position: absolute;
+            z-index: 15;
+            top: 10px;
+            left: 20px;
+            font-size: 14px;
+            color: #888;
+        }
+        &field {
+            position: relative;
+            z-index: 11;
+            width: 100%;
+            height: 100%;
+            padding-top: 30px;
+            background: white;
+            transition: background 0.2s;
+
+            &:focus,
+            &:active {
+                background: #eee;
+            }
+        }
+    }
+
+    @media (max-width: 991px) {
+        height: 60px;
+
+        &__ {
+            &hint {
+                display: none;
+            }
+            &field {
+                padding-top: 0;
+            }
+        }
+    }
+}
+.the-x {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+
+    &:before,
+    &:after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 0;
+        width: 100%;
+        height: 1px;
+        background-color: #969696;
+        transition: background-color 0.2s;
+    }
+    &:before {
+        -webkit-transform: rotate(45deg);
+                transform: rotate(45deg);
+    }
+    &:after {
+        -webkit-transform: rotate(-45deg);
+                transform: rotate(-45deg);
+    }
+
+    &:hover {
+        &:before,
+        &:after {
+            background-color: #73429c;
+        }
+    }
+}
+
+// Transitions
+.fade-enter-active,
+.fade-leave-active {
+    transition: opacity 0.2s;
+}
+.fade-enter,
+.fade-leave-to {
+    opacity: 0;
 }
 </style>

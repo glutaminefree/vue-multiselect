@@ -6,9 +6,15 @@
                 :options="options"
                 :label-key="'hint'"
                 :value-key="'id'"
-                :input-classes="['input_big', 'input_square']"
+                :input-classes="['input_square']"
+                :field-label="'Список'"
+                :simple-input="false"
+                :empty-hint="'Пусто'"
+                :hints="['вид спорта', 'вида спорта', 'видов спорта']"
+                :label-hint="'виды спорта'"
             )
         pre.demo__result(v-html="visibleValue")
+        input.demo__input.input.input_big.input_square(type="text" v-model.number="newValueIndex" @keypress.enter="setNewValue")
 </template>
 
 <script>
@@ -22,6 +28,7 @@ export default {
         return {
             selected: [],
             options:  [],
+            newValueIndex: '',
         }
     },
     created () {
@@ -36,6 +43,12 @@ export default {
             return JSON.stringify(this.selected, null, '  ');
         },
     },
+    methods: {
+        setNewValue () {
+            this.selected = [this.options[this.newValueIndex]];
+            this.newValueIndex = '';
+        },
+    },
 }
 </script>
 
@@ -46,9 +59,17 @@ html, body {
     background-color: #f7f7f7;
     width: 100%;
     height: 100%;
+    font-family: Roboto, Helvetica, Arial, sans-serif;
 }
 * {
     box-sizing: border-box;
+}
+optgroup,
+select,
+button,
+input,
+textarea {
+    font-family: Roboto, Helvetica, Arial, sans-serif;
 }
 .demo {
     display: flex;
@@ -57,6 +78,8 @@ html, body {
 
     &__ {
         &element {
+            flex-shrink: 0;
+            min-width: 280px;
             margin-right: 50px;
         }
         &result {
@@ -65,85 +88,35 @@ html, body {
         }
         &input {}
     }
+
+    @media (max-width: 991px) {
+        padding: 30px 15px;
+    }
 }
 .input {
-    height: 40px;
+    height: 60px;
     padding: 0 10px 0 20px;
-    background-color: white;
+    background: white;
     border: 1px solid #eee;
-    border-radius: 8px;
+    border-radius: 4px;
     box-shadow: none;
-    font-size: 14px;
+    font-size: 16px;
     font-weight: 400;
     color: black;
     transition: 0.2s;
-    -webkit-appearance: none;
-       -moz-appearance: none;
-            appearance: none;
-
-    /* States */
-    &:hover {
-        border-color: #e4dceb;
-        color: #74409d;
-    }
-    &:disabled {
-        border-color: #eee;
-        background-color: #f4f4f4;
-        color: #444;
-        cursor: not-allowed;
-    }
 
     &:invalid,
     &_danger {
-        border: 1px solid #fcc;
-        background-color: #fff9f9;
+        background-color: #fae5e8;
+        border: 1px solid #d0021b;
 
         &:hover {
-            border: 1px solid #fcc;
-            background-color: #fff9f9;
+            background-color: #fae5e8;
+            border: 1px solid #d0021b;
         }
-    }
-    // &:valid,
-    &_success {
-        border-color: #b2e6dc;
-    }
-
-    /* Visual mods */
-    &_big {
-        height: 60px;
-        font-size: 16px;
-    }
-    &_small {
-        height: 30px;
-        padding: 0 10px;
-        border-radius: 5px;
-    }
-    &_circled {
-        border-radius: 20px;
     }
     &_square {
-        border: none;
         border-radius: 0;
-
-        &:active {
-            border: none;
-        }
-    }
-
-    & + .field__error.field__error_static {
-        max-height: 0;
-        opacity: 0;
-        margin-top: 0;
-        transition-property: max-height, opacity;
-        transition-duration: 0.2s;
-    }
-    &:invalid,
-    &_danger {
-        & + .field__error.field__error_static {
-            margin-top: 5px;
-            max-height: 50px;
-            opacity: 1;
-        }
     }
 }
 </style>

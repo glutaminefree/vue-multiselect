@@ -1,6 +1,6 @@
 {
   "name": "multiselect",
-  "version": "0.1.3",
+  "version": "0.3.5",
   "description": "Multiselect component for Vue",
   "author": "glutaminefree",
   "private": true,
